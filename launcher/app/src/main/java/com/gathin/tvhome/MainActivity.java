@@ -1861,6 +1861,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             }
         } else {
             hero.setY(y);
+            // A second Home can cancel the original fade while keeping the same tile focused.
+            if (hero.getAlpha() < 1f) hero.animate().alpha(1f).setDuration(260).start();
+            if (ambientGlow && color == ambientColor && ambient.getAlpha() < 1f)
+                ambient.animate().alpha(1f).setDuration(600).start();
         }
     }
 
@@ -2365,7 +2369,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         root.addView(recommendationShade, 1, new FrameLayout.LayoutParams(-1, -1));
         FrameLayout.LayoutParams shelfParams = (FrameLayout.LayoutParams) shelf.getLayoutParams();
         shelfParams.height = ViewGroup.LayoutParams.MATCH_PARENT;
-        shelfParams.bottomMargin = Math.round(76 * density);
+        // Leave room for the synopsis and ratings without reducing poster size.
+        shelfParams.bottomMargin = Math.round(64 * density);
         shelf.setLayoutParams(shelfParams);
         pageButton = new TextView(this);
         pageButton.setText(R.string.home_recommendations_below);

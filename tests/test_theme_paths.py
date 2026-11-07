@@ -75,11 +75,12 @@ class ThemePathsTest(unittest.TestCase):
         tools = repo / "tools"
         tools.mkdir(parents=True)
         shutil.copy2(ROOT / "tools" / "theme.sh", tools / "theme.sh")
+        shutil.copy2(ROOT / "tools" / "validate_theme_config.py", tools / "validate_theme_config.py")
         client = tools / "venv" / "bin" / "python"
         client.parent.mkdir(parents=True)
         client.write_text(
             '#!/bin/sh\n'
-            'if [ "$1" = "-I" ] && [ "$2" = "-c" ]; then\n'
+            'if [ "$1" = "-I" ] && { [ "$2" = "-c" ] || [ "$2" = "validate_theme_config.py" ]; }; then\n'
             f'  exec "{Path(sys.executable).as_posix()}" "$@"\n'
             'fi\n'
             'shift\n'

@@ -10,6 +10,9 @@ import java.util.Set;
 /** App-owned TV entries retain their original links; no inferred IMDb matching or account upload. */
 final class TvProgram {
     final String key, owner, channelKey, name, poster, intent, app, channel;
+    static final long MAX_CONTINUE_AGE_MS = 90L * 24 * 60 * 60 * 1000;
+    static final int CONTINUE = 0, NEXT = 1, NEW = 2;
+    final int nextType;
     final long position, duration, engagement;
 
     TvProgram(JSONObject row, String table, String app, String channel) {
@@ -21,6 +24,7 @@ final class TvProgram {
         position = Math.max(0, row.optLong("last_playback_position_millis"));
         duration = Math.max(0, row.optLong("duration_millis"));
         engagement = Math.max(0, row.optLong("last_engagement_time_utc_millis"));
+        nextType = row.optInt("watch_next_type", -1);
     }
 
     boolean valid() {
@@ -30,6 +34,13 @@ final class TvProgram {
     int percent() { return duration == 0 ? -1 : (int) Math.min(100, 100.0 * position / duration); }
     boolean inProgress() { return duration > 0 && position > 0 && position < duration; }
     String identity() { return owner + "\n" + intent; }
+
+    boolean keepForResume(long now) {
+        // Never infer completion or age for NEXT/NEW, or for undated rows.
+        if (nextType != CONTINUE && !(nextType < 0 && position > 0)) return true;
+        if (duration > 0 && position > 0 && percent() >= 95) return false;
+        return engagement <= 0 || engagement > now || now - engagement <= MAX_CONTINUE_AGE_MS;
+    }
 
     /** Fairly mix channels instead of letting the first large provider fill the whole shelf. */
     static List<TvProgram> channels(List<TvProgram> all, String selected) {
@@ -45,9 +56,10 @@ final class TvProgram {
         }
     }
 
-    static List<TvProgram> resume(List<TvProgram> watchNext, List<TvProgram> previews) {
-        List<TvProgram> candidates = new ArrayList<>(watchNext);
-        for (TvProgram item : previews) if (item.inProgress()) candidates.add(item);
+    static List<TvProgram> resume(List<TvProgram> watchNext, List<TvProgram> previews, long now) {
+        List<TvProgram> candidates = new ArrayList<>();
+        for (TvProgram item : watchNext) if (item.keepForResume(now)) candidates.add(item);
+        for (TvProgram item : previews) if (item.inProgress() && item.keepForResume(now)) candidates.add(item);
         candidates.sort((a, b) -> Long.compare(b.engagement, a.engagement));
         List<TvProgram> result = new ArrayList<>(); Set<String> seen = new HashSet<>();
         for (TvProgram item : candidates) if (item.valid() && seen.add(item.identity())) result.add(item);

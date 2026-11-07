@@ -38,7 +38,8 @@ public class WallpaperRotationTest {
     }
 
     @Test public void resumedRotationUsesTheConfiguredInterval() {
-        assertFalse(WallpaperRotation.advance(false, false, 1_000, 300_999, 300_000));
+        assertFalse(WallpaperRotation.advance(false, false, 1_000, 298_999, 300_000));
+        assertTrue(WallpaperRotation.advance(false, false, 1_000, 300_999, 300_000));
         assertTrue(WallpaperRotation.advance(false, false, 1_000, 301_000, 300_000));
         assertFalse(WallpaperRotation.advance(false, false, 1_000, 1_000_000, 0));
     }

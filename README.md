@@ -72,6 +72,12 @@ This illustration uses demo content. The screenshots above show the actual apps-
 - **Recommendation years.** For you and Trending show the current release year and two previous
   years (2024–2026 in 2026). Discover uses the same window by default; its menu can explicitly enable
   all years. For you also respects Watchly's configured range. Series use their premiere year.
+- **Optional TV app channels.** Enable them from the recommendations menu to browse channels and Watch Next
+  published by installed apps. Availability depends on the app and Android TV listings permission. Old or nearly
+  finished continue-watching entries are filtered when sufficient progress and date information exists.
+- **Optional ratings and counts.** Configure MDBList and/or TMDB keys on the TV from the recommendations
+  menu to see available scores and vote counts for the focused film or series. TMDB can also show its
+  English-language written-review count. Missing data is omitted; keys stay encrypted on the TV.
 - **Personalized discovery.** Read your Watchly ElfHosted Top Picks catalogs, filter known
   watched titles, and refine ordering with local positive viewing preferences. Public Cinemeta
   catalogs provide discovery and trending views alongside the private Watchly feed.

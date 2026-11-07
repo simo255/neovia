@@ -52,7 +52,7 @@ final class TvCatalog {
     boolean permitted() { return context.checkSelfPermission(PERMISSION) == PackageManager.PERMISSION_GRANTED; }
     boolean loading() { return loading; }
     List<TvProgram> items(boolean resume, String selected) {
-        return resume ? TvProgram.resume(next, previews) : TvProgram.channels(previews, selected);
+        return resume ? TvProgram.resume(next, previews, System.currentTimeMillis()) : TvProgram.channels(previews, selected);
     }
     void refresh(boolean force) {
         if (closed || loading) return;
@@ -82,7 +82,7 @@ final class TvCatalog {
                 List<String> previewColumns = new ArrayList<>(); Collections.addAll(previewColumns, common);
                 previewColumns.add("channel_id"); previewColumns.add("weight");
                 List<String> nextColumns = new ArrayList<>(); Collections.addAll(nextColumns, common);
-                nextColumns.add("last_engagement_time_utc_millis");
+                nextColumns.add("last_engagement_time_utc_millis"); nextColumns.add("watch_next_type");
                 List<TvProgram> programs = programs(query("preview_program", previewColumns.toArray(new String[0]), "weight DESC"),
                         "preview", hidden, appNames, channelNames);
                 List<TvProgram> watchNext = programs(query("watch_next_program", nextColumns.toArray(new String[0]), "last_engagement_time_utc_millis DESC"),

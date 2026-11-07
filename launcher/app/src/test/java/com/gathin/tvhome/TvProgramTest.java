@@ -29,8 +29,20 @@ public class TvProgramTest {
     @Test public void resumeCombinesWatchNextAndRealPreviewProgressButNotUntouchedLibraryItems() throws Exception {
         TvProgram watch = item(1, 1, "example:watch", 0, 100, 10), progress = item(2, 2, "example:progress", 20, 100, 0);
         TvProgram untouched = item(3, 3, "example:library", 0, 100, 0), ended = item(4, 3, "example:ended", 100, 100, 0);
-        List<TvProgram> result = TvProgram.resume(Collections.singletonList(watch), Arrays.asList(watch, progress, untouched, ended));
+        List<TvProgram> result = TvProgram.resume(Collections.singletonList(watch), Arrays.asList(watch, progress, untouched, ended), 100);
         assertEquals(Arrays.asList(watch, progress), result);
+    }
+    @Test public void oldAndNearlyCompleteContinuesAreHiddenButNextAndUndatedRemain() throws Exception {
+        long now = TvProgram.MAX_CONTINUE_AGE_MS + 1_000;
+        TvProgram old = item(1, 1, "example:old", 20, 100, 1);
+        TvProgram complete = item(2, 1, "example:complete", 95, 100, now);
+        TvProgram undated = item(3, 1, "example:undated", 20, 100, 0);
+        TvProgram next = new TvProgram(new JSONObject().put("_id", 4).put("package_name", "com.example.tv")
+                .put("title", "Next").put("intent_uri", "example:next").put("watch_next_type", 1)
+                .put("last_engagement_time_utc_millis", 1).put("last_playback_position_millis", 99)
+                .put("duration_millis", 100), "next", "Example", "");
+        assertEquals(Arrays.asList(next, undated), TvProgram.resume(Arrays.asList(old, complete, next),
+                Collections.singletonList(undated), now));
     }
     @Test public void progressIsClampedAndUnknownDurationStaysUnknown() throws Exception {
         assertEquals(20, item(1, 1, "example:a", 20, 100, 0).percent());

@@ -17,6 +17,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
+import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
@@ -44,6 +45,8 @@ final class RecommendationsShelf {
     private final RecommendationRepository repository;
     private final TvCatalog tv;
     private final StremioResume stremio;
+    private final RatingService ratings;
+    private Runnable ratingRequest;
     private final Map<String, StremioProgress.Item> resumeItems = new HashMap<>();
     private final Map<String, TvProgram> tvPrograms = new HashMap<>();
     private final Runnable focusDock, focusTop;
@@ -67,7 +70,7 @@ final class RecommendationsShelf {
     private int source, pendingFocus = -1;
     private String syncStatus = "";
     private boolean catalogReady;
-    private boolean catalogEmpty, tvResume, stremioUpcoming;
+    private boolean catalogEmpty, tvResume, stremioUpcoming, tvEnabled;
     private String tvChannel;
     private List<CatalogItem> movies = new ArrayList<>(), shows = new ArrayList<>();
     private final int[] sourceNames = {R.string.reco_for_you, R.string.reco_watchlist, R.string.reco_trending, R.string.reco_tv, 0, R.string.reco_recent, R.string.stremio_resume};
@@ -85,6 +88,7 @@ final class RecommendationsShelf {
         repository.posterTarget(dp(136), dp(204));
         tv = new TvCatalog(activity);
         stremio = new StremioResume(activity);
+        ratings = new RatingService(activity);
         if (repository.enhanced()) {
             sourceNames[CatalogSource.RECENT] = R.string.reco_discover;
             stremio.observeViewing(repository::observe);
@@ -92,9 +96,11 @@ final class RecommendationsShelf {
         enabled = activity.getSharedPreferences("recommendations", 0).getBoolean("enabled", true);
         showSeries = activity.getSharedPreferences("recommendations", 0).getBoolean("series", false);
         tvResume = activity.getSharedPreferences("recommendations", 0).getBoolean("tv_resume", false);
+        tvEnabled = activity.getSharedPreferences("recommendations", 0).getBoolean("tv_enabled", false);
         stremioUpcoming = activity.getSharedPreferences("recommendations", 0).getBoolean("stremio_upcoming", false);
         tvChannel = activity.getSharedPreferences("recommendations", 0).getString("tv_channel", "");
         source = CatalogSource.restore(activity.getSharedPreferences("recommendations", 0).getInt("source", 0));
+        if (source == TV && !tvEnabled) source = CatalogSource.WATCHLY;
         LinearLayout panel = new LinearLayout(activity); panel.setOrientation(LinearLayout.VERTICAL);
         host.addView(panel, new FrameLayout.LayoutParams(-1, -1));
         LinearLayout header = new LinearLayout(activity); header.setGravity(Gravity.CENTER_VERTICAL);
@@ -106,6 +112,7 @@ final class RecommendationsShelf {
                 HomeAppearance.control(sources[i], true); sources[i].setTextSize(15);
                 if (i == CatalogSource.WATCHLY) sources[i].setText(R.string.cinema_for_you);
             }
+            if (i == TV && !tvEnabled) sources[i].setVisibility(View.GONE);
             sources[i].setOnClickListener(v -> source(index, true));
             header.addView(sources[i]);
         }
@@ -333,7 +340,9 @@ final class RecommendationsShelf {
         List<CatalogItem> cards = new ArrayList<>(); tvPrograms.clear();
         for (TvProgram item : tv.items(tvResume, tvChannel)) {
             String detail = item.app + (item.channel.isEmpty() ? "" : " \u00B7 " + item.channel);
-            if (tvResume && item.percent() >= 0) detail += " \u00B7 " + item.percent() + "%";
+            if (tvResume && item.nextType == TvProgram.NEXT) detail += " · " + activity.getString(R.string.stremio_next_episode);
+            else if (tvResume && item.nextType == TvProgram.NEW) detail += " · " + activity.getString(R.string.stremio_new_episode);
+            else if (tvResume && item.percent() >= 0) detail += " · " + item.percent() + "%";
             try {
                 cards.add(new CatalogItem(new JSONObject().put("id", item.key).put("type", "tv").put("name", item.name)
                         .put("year", detail).put("poster", item.poster)));
@@ -424,7 +433,7 @@ final class RecommendationsShelf {
     void trimMemory() { repository.trimMemory(); }
     void tick() { if (enabled) refresh(AccountRefresh.Trigger.TICK, false); }
     void pause() { host.removeCallbacks(focusRefresh); stremio.pause(); }
-    void close() { host.removeCallbacks(focusRefresh); repository.close(); tv.close(); stremio.close(); }
+    void close() { host.removeCallbacks(focusRefresh); if (ratingRequest != null) host.removeCallbacks(ratingRequest); ratings.close(); repository.close(); tv.close(); stremio.close(); }
     boolean focused() { return host.hasFocus(); }
     boolean returningFromItem() { return returningFromItem; }
     void returnedFromItem() { returningFromItem = false; }
@@ -474,11 +483,17 @@ final class RecommendationsShelf {
             options.add(activity.getString(R.string.reco_reset_feedback));
             options.add(activity.getString(stremio.connected() ? R.string.stremio_disconnect : R.string.stremio_connect));
             if (repository.enhanced() && source == CatalogSource.RECENT) options.add(activity.getString(repository.recentOnly() ? R.string.reco_all_years : R.string.reco_recent_years));
+            final int tvChoice = options.size();
+            options.add(activity.getString(R.string.reco_tv_open));
+            final int ratingChoice = options.size();
+            options.add(activity.getString(R.string.ratings_settings));
             final int syncChoice = options.size();
             options.add(activity.getString(repository.feedbackSyncEnabled() ? R.string.reco_sync_disable : R.string.reco_sync_enable));
             CinemaMenu.show(activity, activity.getString(R.string.reco_menu),
                     choiceStatus.isEmpty() ? syncStatus : syncStatus + "\n" + choiceStatus, options, choice -> {
-                if (choice == syncChoice) { feedbackSyncMenu(); }
+                if (choice == tvChoice) { openTv(); }
+                else if (choice == ratingChoice) { ratingSettings(); }
+                else if (choice == syncChoice) { feedbackSyncMenu(); }
                 else if (choice == 0) refresh(AccountRefresh.Trigger.FORCE, true);
                 else if (choice == 1) {
                     enabled = !enabled; activity.getSharedPreferences("recommendations", 0).edit().putBoolean("enabled", enabled).apply();
@@ -503,12 +518,18 @@ final class RecommendationsShelf {
         labels.add(activity.getString(R.string.reco_reset_feedback));
         labels.add(activity.getString(stremio.connected() ? R.string.stremio_disconnect : R.string.stremio_connect));
         if (repository.enhanced() && source == CatalogSource.RECENT) labels.add(activity.getString(repository.recentOnly() ? R.string.reco_all_years : R.string.reco_recent_years));
+        final int tvChoice = labels.size();
+        labels.add(activity.getString(R.string.reco_tv_open));
+        final int ratingChoice = labels.size();
+        labels.add(activity.getString(R.string.ratings_settings));
         final int syncChoice = labels.size();
         labels.add(activity.getString(repository.feedbackSyncEnabled() ? R.string.reco_sync_disable : R.string.reco_sync_enable));
         new AlertDialog.Builder(activity, dialogTheme).setTitle(activity.getString(R.string.reco_menu)
                 + (choiceStatus.isEmpty() ? "" : "\n" + choiceStatus))
                 .setItems(labels.toArray(new String[0]), (dialog, choice) -> {
-                    if (choice == syncChoice) { feedbackSyncMenu(); }
+                    if (choice == tvChoice) { openTv(); }
+                    else if (choice == ratingChoice) { ratingSettings(); }
+                    else if (choice == syncChoice) { feedbackSyncMenu(); }
                     else if (choice == order.length + 6) {
                         repository.togglePeriod(); render();
                     }
@@ -526,12 +547,48 @@ final class RecommendationsShelf {
                         updateVisibility(); if (enabled) refresh(AccountRefresh.Trigger.FOREGROUND, true); focusDock.run();
                     } else {
                         enabled = true; activity.getSharedPreferences("recommendations", 0).edit().putBoolean("enabled", true).apply();
+                        if (choice < order.length && order[choice] == TV) { openTv(); return; }
                         if (choice < order.length) source(order[choice], true);
                         else if (source == TV && choice == order.length) { channelMenu(); return; }
                         else category(choice == order.length + 1);
                         dockVisible(true); focusDock.run(); focusCard(0);
                     }
                 }).setPositiveButton(R.string.done, null).show();
+    }
+    private void openTv() {
+        tvEnabled = true;
+        activity.getSharedPreferences("recommendations", 0).edit().putBoolean("tv_enabled", true).apply();
+        sources[TV].setVisibility(View.VISIBLE);
+        source(TV, true);
+        sources[TV].requestFocus();
+    }
+    private EditText ratingKeyInput(int hint, int maxLength) {
+        EditText input = new EditText(activity);
+        input.setSingleLine(true); input.setHint(hint);
+        input.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD | android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        input.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(maxLength)});
+        return input;
+    }
+    private void ratingSettings() {
+        LinearLayout fields = new LinearLayout(activity); fields.setOrientation(LinearLayout.VERTICAL);
+        fields.setPadding(dp(20), 0, dp(20), 0);
+        EditText mdbInput = ratingKeyInput(R.string.ratings_mdb_hint, 128);
+        EditText tmdbInput = ratingKeyInput(R.string.ratings_tmdb_hint, 4096);
+        fields.addView(mdbInput); fields.addView(tmdbInput);
+        AlertDialog.Builder dialog = new AlertDialog.Builder(activity, dialogTheme)
+                .setTitle(R.string.ratings_settings).setMessage(R.string.ratings_explain).setView(fields)
+                .setPositiveButton(R.string.ratings_save, (d, w) -> {
+                    if (!ratings.configure(mdbInput.getText().toString().trim(), tmdbInput.getText().toString().trim())) {
+                        Toast.makeText(activity, R.string.ratings_key_error, Toast.LENGTH_LONG).show(); return;
+                    }
+                    Toast.makeText(activity, R.string.ratings_saved, Toast.LENGTH_LONG).show();
+                    if (lastFocusedCard < adapter.values.size()) showPreview(lastFocusedCard);
+                }).setNegativeButton(android.R.string.cancel, null);
+        if (ratings.configured()) dialog.setNeutralButton(R.string.ratings_remove, (d, w) -> {
+            ratings.clear();
+            if (lastFocusedCard < adapter.values.size()) showPreview(lastFocusedCard);
+        });
+        dialog.show();
     }
     private void feedbackMenu(CatalogItem item) {
         int[] names = {R.string.reco_more_like_this, R.string.reco_not_interested,
@@ -754,7 +811,18 @@ final class RecommendationsShelf {
             View card = list.getChildAt(i);
             card.setSelected(list.getChildAdapterPosition(card) == position);
         }
-        preview.show(item, caption(item));
+        RatingData cached = ratings.cached(item.type, item.id);
+        List<RatingData.Cell> formatted = cached == null ? java.util.Collections.emptyList() : cached.cells(activity.getResources().getConfiguration().getLocales().get(0), activity.getString(R.string.ratings_votes), activity.getString(R.string.ratings_reviews_short));
+        preview.show(item, caption(item), formatted);
+        if (ratingRequest != null) host.removeCallbacks(ratingRequest);
+        if (cached == null && ratings.configured()) {
+            String identity = RecommendationFocus.key(item);
+            ratingRequest = () -> { if (!visible() || !identity.equals(lastFocusedKey) || !preview.isShown()) return; ratings.request(item.type, item.id, data -> {
+                if (!visible() || !identity.equals(lastFocusedKey) || !preview.isShown()) return;
+                preview.show(item, caption(item), data.cells(activity.getResources().getConfiguration().getLocales().get(0), activity.getString(R.string.ratings_votes), activity.getString(R.string.ratings_reviews_short)));
+            }); };
+            host.postDelayed(ratingRequest, 700);
+        }
     }
     private String caption(CatalogItem item) {
         if (source == CatalogSource.WATCHLY) return "Watchly · " + item.year;

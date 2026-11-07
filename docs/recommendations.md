@@ -449,3 +449,22 @@ Talk-Show and Game-Show; movie rotation stays within Cinemeta's 19 movie genres.
 An empty private history with nonempty raw recommendation catalogs is accepted; previously known
 history is retained. Only a completely empty private response retains the previous cache with the
 internal EMPTY_PRIVATE status, independent of real HTTP authentication errors.
+
+## Optional ratings and review counts
+
+On the TV, open the quick menu, select **Home content**, then **Movie and series ratings**.
+You can enter an MDBList API key, a TMDB API key or read-access token, or both; leave a field
+empty to keep its existing key. Choose Remove keys to disable the lookups. Keys are stored encrypted
+in app-private, no-backup storage using Android Keystore; the Watchly server does not expose its key
+to Neovia. Do not put keys in source files or share them in screenshots.
+
+When the user settles on a movie or series, Neovia requests its public IMDb ID from the enabled
+providers and caches results in memory. MDBList supplies available individual scores and vote
+counts; TMDB supplies its own score, vote count and the number of English-language written reviews.
+A vote count is not labeled as a written-review count; “reviews EN” / “avis EN” means written reviews in English.
+Scores, votes and review counts equal to zero are hidden. Missing values are omitted; existing
+recommendations continue to work if the network, a key or a provider is unavailable. An MDBList
+free key is subject to its account-wide API quota. No ratings request runs unless a key is configured.
+
+Rating logos are adapted from [Simple Icons](https://simpleicons.org/) and the TMDB logo.
+The marks belong to their respective owners.

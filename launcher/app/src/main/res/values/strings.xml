@@ -175,4 +175,16 @@
     <string name="reco_discover">Discover</string>
     <string name="reco_all_years">Show all years</string>
     <string name="reco_recent_years">Show recent years</string>
+    <string name="reco_tv_open">Show TV app channels</string>
+    <string name="ratings_settings">Movie and series ratings</string>
+    <string name="ratings_explain">Optional keys: MDBList supplies scores and votes; TMDB supplies its score, votes and English-language written review count. When you focus a title, its IMDb ID is sent to configured providers. Keys are encrypted on this TV. Leave a field blank to keep its existing key.</string>
+    <string name="ratings_save">Save</string>
+    <string name="ratings_remove">Remove keys</string>
+    <string name="ratings_key_error">Could not save the key. Check it and try again.</string>
+    <string name="ratings_saved">Keys saved; ratings depend on provider availability.</string>
+    <string name="ratings_votes">votes</string>
+    <string name="ratings_mdb_hint">MDBList API key</string>
+    <string name="ratings_tmdb_hint">TMDB API key or read token</string>
+    <string name="ratings_reviews_en">written reviews in English</string>
+    <string name="ratings_reviews_short">reviews EN</string>
 </resources>

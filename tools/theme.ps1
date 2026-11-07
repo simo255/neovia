@@ -62,7 +62,8 @@ if ($Reset) {
 if (-not $Theme) { throw 'usage: theme.ps1 <theme folder> | -Reset' }
 $config = Join-Path $Theme 'config.json'
 if (-not (Test-Path $config)) { throw "no config.json in $Theme" }
-try { Get-Content $config -Raw | ConvertFrom-Json | Out-Null } catch { throw "$config is not valid JSON" }
+& $py -I validate_theme_config.py $config
+if ($LASTEXITCODE -ne 0) { throw "Theme was not sent to the TV" }
 
 & $py -I tv.py "mkdir -p $dir 2>/dev/null" | Out-Null
 & $py -I tv.py --push $config "$tmp-config.json" | Out-Null

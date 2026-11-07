@@ -13,14 +13,14 @@ public class CatalogSourceTest {
             assertEquals(saved, CatalogSource.restore(saved));
     }
     @Test public void activeSourcesExcludeGoogleWithoutChangingStoredIds() {
-        assertArrayEquals(new int[]{6, 0, 5, 2}, CatalogSource.displayOrder());
+        assertArrayEquals(new int[]{6, 0, 5, 2, 3}, CatalogSource.displayOrder());
         assertEquals(4, CatalogSource.GOOGLE);
         assertEquals(7, CatalogSource.COUNT);
         assertEquals(CatalogSource.STREMIO, CatalogSource.restore(6));
     }
     @Test public void removedSectionsFallBackToWatchlyWhenRestoringSavedPreferences() {
         assertEquals(CatalogSource.WATCHLY, CatalogSource.restore(CatalogSource.WATCHLIST));
-        assertEquals(CatalogSource.WATCHLY, CatalogSource.restore(CatalogSource.TV));
+        assertEquals(CatalogSource.TV, CatalogSource.restore(CatalogSource.TV));
         assertEquals(CatalogSource.WATCHLY, CatalogSource.restore(CatalogSource.GOOGLE));
     }
     @Test public void googleAndLocalAppsDoNotUseTheWatchlyOrPopularNetworkFeeds() {

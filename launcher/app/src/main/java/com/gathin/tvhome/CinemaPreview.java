@@ -124,11 +124,8 @@ final class CinemaPreview extends LinearLayout {
             text.setShadowLayer(dp(2), 0, dp(1), 0xE6000000);
         for (int i = 0; i < ratingsRow.getChildCount(); i++) {
             LinearLayout column = (LinearLayout) ratingsRow.getChildAt(i);
-            LinearLayout primary = (LinearLayout) column.getChildAt(0);
-            for (int j = 0; j < primary.getChildCount(); j++)
-                if (primary.getChildAt(j) instanceof TextView)
-                    ((TextView) primary.getChildAt(j)).setShadowLayer(dp(2), 0, dp(1), 0xE6000000);
-            ((TextView) column.getChildAt(1)).setShadowLayer(dp(2), 0, dp(1), 0xE6000000);
+            for (int j = 0; j < column.getChildCount(); j++)
+                ((TextView) column.getChildAt(j)).setShadowLayer(dp(2), 0, dp(1), 0xE6000000);
         }
     }
 
